@@ -3,6 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
+import { validateStrictEmail } from "../utils/EmailValidate.js";
 
 export const registerUser = asyncHandler(async (req, res, next) => {
   // get user detail from frotend
@@ -20,6 +21,11 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   }
   if (password === "") {
     throw new ApiError(400, "Password is required");
+  }
+
+  // check for email validation
+  if (!validateStrictEmail(email)) {
+    throw new ApiError(400, "Invalid email");
   }
 
   // check if user already exist
