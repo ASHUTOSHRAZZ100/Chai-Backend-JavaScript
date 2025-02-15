@@ -3,7 +3,7 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { validateStrictEmail } from "../utils/EmailValidate.js";
+import { isValidEmail,isValidPasswordLength,isValidUsername } from "../utils/ValidateCheck.js";
 
 export const registerUser = asyncHandler(async (req, res, next) => {
   // get user detail from frotend
@@ -22,10 +22,20 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   if (password === "") {
     throw new ApiError(400, "Password is required");
   }
+  
+  // check for username validation
+  if(!isValidUsername(username)){
+    throw new ApiError(400, "Invalid username");
+  }
 
   // check for email validation
-  if (!validateStrictEmail(email)) {
+  if (!isValidEmail(email)) {
     throw new ApiError(400, "Invalid email");
+  }
+  
+  // check for password length
+  if(!isValidPasswordLength(password)){
+    throw new ApiError(400, "Password must be between 8 and 20 characters");
   }
 
   // check if user already exist
