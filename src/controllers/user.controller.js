@@ -3,9 +3,31 @@ import { ApiError } from "../utils/ApiError.js";
 import { User } from "../models/user.models.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import { isValidEmail,isValidPasswordLength,isValidUsername } from "../utils/ValidateCheck.js";
+import {
+  isValidEmail,
+  isValidPasswordLength,
+  isValidUsername,
+} from "../utils/ValidateCheck.js";
 
-export const registerUser = asyncHandler(async (req, res, next) => {
+const genrateAccessAndRefreshToken = async (userId) => {
+  try {
+    const user = await User.findById(userId);
+
+    const accessToken = user.genrateAccessToken();
+    const refreshToken = user.genrateRefreshToken();
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+    return { accessToken, refreshToken };
+  } catch (error) {
+    throw new ApiError(
+      500,
+      "something went wrong while generating referesh and access token"
+    );
+  }
+};
+
+// Register User
+const registerUser = asyncHandler(async (req, res) => {
   // get user detail from frotend
   const { fullname, username, email, password } = req.body;
 
@@ -22,9 +44,9 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   if (password === "") {
     throw new ApiError(400, "Password is required");
   }
-  
+
   // check for username validation
-  if(!isValidUsername(username)){
+  if (!isValidUsername(username)) {
     throw new ApiError(400, "Invalid username");
   }
 
@@ -32,9 +54,9 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   if (!isValidEmail(email)) {
     throw new ApiError(400, "Invalid email");
   }
-  
+
   // check for password length
-  if(!isValidPasswordLength(password)){
+  if (!isValidPasswordLength(password)) {
     throw new ApiError(400, "Password must be between 8 and 20 characters");
   }
 
@@ -51,8 +73,12 @@ export const registerUser = asyncHandler(async (req, res, next) => {
   const avatarLocalPath = req.files?.avatar[0]?.path;
   // const coverImageLocalPath = req.files?.coverImage[0]?.path;
   let coverImageLocalPath = null;
-  if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
-     coverImageLocalPath = req.files.coverImage[0].path;
+  if (
+    req.files &&
+    Array.isArray(req.files.coverImage) &&
+    req.files.coverImage.length > 0
+  ) {
+    coverImageLocalPath = req.files.coverImage[0].path;
   }
 
   if (!avatarLocalPath) {
@@ -91,3 +117,59 @@ export const registerUser = asyncHandler(async (req, res, next) => {
     .status(201)
     .json(new ApiResponse(201, "User created successfully", createdUser));
 });
+
+// Login User
+const loginUser = asyncHandler(async (req, res) => {
+  // req body -> data
+  const { email, username, password } = req.body;
+
+  // check username or email match
+  if (!username || !email) {
+    throw new ApiError(400, "username or email is required");
+  }
+
+  // find the user
+  const user = await User.findOne({
+    $or: [{ username }, { email }],
+  });
+  if (!user) {
+    throw new ApiError(404, "User does not exist");
+  }
+
+  // password check
+  const isPasswordValid = await user.isPasswordCorrect(password);
+  if (!isPasswordValid) {
+    throw new ApiError(401, "Invalid user credentials");
+  }
+
+  // access and referesh token
+  const { accessToken, refreshToken } = await genrateAccessAndRefreshToken(
+    user._id
+  );
+  const loggedInUser = await User.findById(user._id).select(
+    "-password -refreshToken"
+  );
+
+  // send cookie
+  const options = {
+    httpOnly: true,
+    secure: true,
+  };
+  res
+    .status(200)
+    .cookie("accessToken", accessToken, options)
+    .cookie("refreshToken", refreshToken, options)
+    .json(
+      new ApiResponse(
+        200,
+        {
+          users: loggedInUser,
+          accessToken,
+          refreshToken,
+        },
+        "User logged In successfully"
+      )
+    );
+});
+
+export { registerUser,loginUser };
