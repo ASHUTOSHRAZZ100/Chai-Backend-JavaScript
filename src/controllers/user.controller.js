@@ -10,6 +10,7 @@ import {
   isValidUsername,
 } from "../utils/ValidateCheck.js";
 
+// Generate Access and Refresh Token
 const genrateAccessAndRefreshToken = async (userId) => {
   try {
     const user = await User.findById(userId);
@@ -195,6 +196,7 @@ const logoutUser = asyncHandler(async (req, res) => {
     .json(new ApiResponse(200, {}, "user Logged Out"));
 });
 
+// Refresh Access Token
 const refreshAccessToken = asyncHandler(async (req, res) => {
   const incomingRefreshToken =
     req.cookies.refreshToken || req.body.refreshToken;
@@ -239,4 +241,35 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     throw new ApiError(401, error?.message || "Invalid refresh token");
   }
 });
-export { registerUser, loginUser, logoutUser ,refreshAccessToken};
+
+// Change Password
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+  const { oldPassword, newPassword } = req.body;
+  if (!oldPassword || !newPassword) {
+    throw new ApiError(400, "Old and new password is required");
+  }
+  // check for password length
+  if (!isValidPasswordLength(newPassword)) {
+    throw new ApiError(400, "Password must be between 8 and 20 characters");
+  }
+  const user = await User.findById(req.user?._id);
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+  const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+  if (!isPasswordCorrect) {
+    throw new ApiError(400, "Invalid old password");
+  }
+  user.password = newPassword;
+  await user.save({ validateBeforeSave: false });
+  return res
+    .status(200)
+    .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+export {
+  registerUser,
+  loginUser,
+  logoutUser,
+  refreshAccessToken,
+  changeCurrentPassword,
+};
