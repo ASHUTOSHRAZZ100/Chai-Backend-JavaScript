@@ -294,42 +294,140 @@ const updateAccountDetails = asyncHandler(async (req, res) => {
 });
 
 // Update User Avatar
-const updateUserAvatar = asyncHandler(async(req,res)=>{
-  const avatraLocalPath  = req.file?.path;
+const updateUserAvatar = asyncHandler(async (req, res) => {
+  const avatraLocalPath = req.file?.path;
 
-  if(!avatraLocalPath){
-    throw new ApiError(40,"Avatar file is missing");
+  if (!avatraLocalPath) {
+    throw new ApiError(40, "Avatar file is missing");
   }
 
   const avatar = await uploadOnCloudinary(avatraLocalPath);
 
-  if(!avatar.url){
-    throw new ApiError(400,"Error while uploading on avatar");
+  if (!avatar.url) {
+    throw new ApiError(400, "Error while uploading on avatar");
   }
-  const user = await User.findByIdAndUpdate(req.user?._id,{
-    $set:{avatar:avatar.url}
-  },{new:true,}).select("-password");
-  return res.status(200),json(200,user,"Avatar image update successfully")
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: { avatar: avatar.url },
+    },
+    { new: true }
+  ).select("-password");
+  return res.status(200), json(200, user, "Avatar image update successfully");
 });
 
 // Update user Cover-Image
-const updateUserCoverImage = asyncHandler(async(req,res)=>{
-  const coverImageLocalPath  = req.file?.path;
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+  const coverImageLocalPath = req.file?.path;
 
-  if(!coverImageLocalPath){
-    throw new ApiError(40,"Cover Image file is missing");
+  if (!coverImageLocalPath) {
+    throw new ApiError(40, "Cover Image file is missing");
   }
 
   const coverImage = await uploadOnCloudinary(coverImageLocalPath);
 
-  if(!coverImage.url){
-    throw new ApiError(400,"Error while uploading on Cover Image");
+  if (!coverImage.url) {
+    throw new ApiError(400, "Error while uploading on Cover Image");
   }
-  const user = await User.findByIdAndUpdate(req.user?._id,{
-    $set:{coverImage:coverImage.url}
-  },{new:true,}).select("-password");
-  return res.status(200).json(200,user,"Cover image update successfully")
+  const user = await User.findByIdAndUpdate(
+    req.user?._id,
+    {
+      $set: { coverImage: coverImage.url },
+    },
+    { new: true }
+  ).select("-password");
+  return res.status(200).json(200, user, "Cover image update successfully");
 });
+
+// Get User Channel Profile
+const getUserChannelProfile = asyncHandler(async (req, res) => {
+  const { username } = req.params;
+  if (!username?.trim()) {
+    throw new ApiError(400, "Username is missing");
+  }
+
+  // get user channel profile
+  const channel = await User.aggregate([
+    // match username
+    {
+      $match: {
+        username: username?.toLowerCase(),
+      },
+    },
+
+    // lookup for subscription channel through
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "channel",
+        as: "subscribers",
+      },
+    },
+
+    // lookup for subscription subscriber through
+    {
+      $lookup: {
+        from: "subscriptions",
+        localField: "_id",
+        foreignField: "subscriber",
+        as: "subscribedTo",
+      },
+    },
+
+    // add fields
+    {
+      $addFields: {
+        // count of subscribers
+
+        subscribersCount: {
+          $size: "$subscribers",
+        },
+
+        // count of subscribedTo
+
+        channelSubscribedToCount: {
+          $size: "$subscribedTo",
+        },
+
+        // check if user is subscribed
+        isSubscribed: {
+          $cond: {
+            if: { $in: [req.user?._id, "$subscribers.subscriber"] },
+            then: true,
+            else: false,
+          },
+        },
+      },
+    },
+
+    // project fields
+    {
+      $project: {
+        fullname: 1, // project fullname 1 for send and 0 for not to send
+        username: 1,
+        subscribersCount: 1,
+        channelSubscribedToCount: 1,
+        isSubscribed: 1,
+        avatar: 1,
+        coverImage: 1,
+        password: 0, // project password not to send
+        refreshToken: 0,
+        subscribers: 0,
+        subscribedTo: 0,
+      },
+    },
+  ]);
+
+  if (!channel?.length) {
+    throw new ApiError(404, "Channel not found");
+  }
+
+  return res
+    .status(200)
+    .json(new ApiResponse(200, channel[0], "Channel profile fetched Successfully"));
+});
+
 export {
   registerUser,
   loginUser,
@@ -340,4 +438,5 @@ export {
   updateAccountDetails,
   updateUserAvatar,
   updateUserCoverImage,
+  getUserChannelProfile,
 };
