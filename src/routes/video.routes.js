@@ -5,9 +5,10 @@ import {
   getAllVideos,
   publishVideo,
   getVideoById,
-  updateVideo,
+  updateVideoThumbnail,
   deleteVideo,
   tooglePublishStatus,
+  deleteVideoThumbnail,
 } from "../controllers/video.controller.js";
 
 const router = Router();
@@ -25,11 +26,14 @@ router
     publishVideo
   );
 
+router.route("/:videoId").get(getVideoById);
+
+router.route("/video/:videoId").delete(deleteVideo);
+
 router
-  .route("/:videoId")
-  .get(getVideoById)
-  .delete(deleteVideo)
-  .patch(upload.single("thumbnail"), updateVideo);
+  .route("/thumbnail/:videoId")
+  .delete(deleteVideoThumbnail)
+  .patch(upload.single("thumbnail"), updateVideoThumbnail);
 
 router.route("/toggle/publish/:videoId").patch(tooglePublishStatus);
 
