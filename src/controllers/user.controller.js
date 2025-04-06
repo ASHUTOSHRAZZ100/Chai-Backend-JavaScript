@@ -108,7 +108,7 @@ const registerUser = asyncHandler(async (req, res) => {
     username: username.toLowerCase(),
     email: email.toLowerCase(),
     fullname,
-    avatar: avatar?.url|| "",
+    avatar: avatar?.url || "",
     coverImage: coverImage?.url || "",
     password,
   });
@@ -185,6 +185,10 @@ const loginUser = asyncHandler(async (req, res) => {
 
 // Logout User
 const logoutUser = asyncHandler(async (req, res) => {
+  if (!req.user || !req.user._id) {
+    throw new ApiError(401, "Not authenticated");
+  }
+
   await User.findByIdAndUpdate(
     req.user._id,
     {
@@ -197,6 +201,7 @@ const logoutUser = asyncHandler(async (req, res) => {
   const options = {
     httpOnly: true,
     secure: true,
+    sameSite: "None", 
   };
   return res
     .status(200)
@@ -484,8 +489,8 @@ const getWatchHistory = asyncHandler(async (req, res) => {
   ]);
 
   return res
-  .status(200)
-  .json(new ApiResponse(200, user[0], "Watch history fetched successfully"));
+    .status(200)
+    .json(new ApiResponse(200, user[0], "Watch history fetched successfully"));
 });
 
 export {
